@@ -4584,6 +4584,8 @@ let
     usePulseAudio = config.pulseaudio or true;
   };
 
+  inherit (gnome3) baobab;
+
   libarchive = callPackage ../development/libraries/libarchive { };
 
   libass = callPackage ../development/libraries/libass { };
