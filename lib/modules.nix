@@ -155,6 +155,9 @@ rec {
     let
       # Process mkOverride properties, adding in the default
       # value specified in the option declaration (if any).
+      # Note that defsFinal may contain undischarged mkMap properties,
+      # as mkMap can only be discharged in the merge function of the
+      # relevant (mappable) type
       defsFinal = filterOverrides
         ((if opt ? default then [{ file = head opt.declarations; value = mkOptionDefault opt.default; }] else []) ++ defs);
       files = map (def: def.file) defsFinal;
@@ -165,8 +168,11 @@ rec {
           throw "The option `${showOption loc}' is used but not defined."
         else
           fold (def: res:
-            if opt.type.check def.value then res
-            else throw "The option value `${showOption loc}' in `${def.file}' is not a ${opt.type.name}.")
+            if def.value._type or "" == "map"
+              then if opt.type.mappable then res
+                else throw "Option value `${showOption loc}' in `${def.file}' is a mkMap but ${opt.type.name} is not mappable"
+              else if opt.type.check def.value then res
+                else throw "The option value `${showOption loc}' in `${def.file}' is not a ${opt.type.name}.")
             (opt.type.merge loc defsFinal) defsFinal;
       # Finally, apply the ‘apply’ function to the merged
       # value.  This allows options to yield a value computed
@@ -301,6 +307,16 @@ rec {
   mkVMOverride = mkOverride 10; # used by ‘nixos-rebuild build-vm’
 
   mkFixStrictness = id; # obsolete, no-op
+
+  # Map a function, which takes an index ((defnNum, index) for lists, attrname
+  # for sets, etc) and returns a list of values to be merged in with the other
+  # values defined for that index, over a collection. This can for example be
+  # used to apply some config to *every* submodule in an attrsOf submodule
+  # without needing to know which attrs are actually defined elsewhere.
+  mkMap = f:
+    { _type = "map";
+      inherit f;
+    };
 
   # FIXME: Add mkOrder back in. It's not currently used anywhere in
   # NixOS, but it should be useful.

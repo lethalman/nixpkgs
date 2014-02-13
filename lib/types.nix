@@ -34,9 +34,11 @@ rec {
     , # Return a flat list of sub-options.  Used to generate
       # documentation.
       getSubOptions ? prefix: {}
+    , # A mappable type can handle mkMap defs
+      mappable ? false
     }:
     { _type = "option-type";
-      inherit name check merge getSubOptions;
+      inherit name check merge getSubOptions mappable;
     };
 
 
@@ -107,32 +109,49 @@ rec {
       name = "list of ${elemType.name}s";
       check = value: isList value && all elemType.check value;
       merge = loc: defs:
-        concatLists (imap (n: def: imap (m: def':
+        let
+          nonMaps = filter (d: d.value._type or "" != "map") defs;
+          maps = filter (d: d.value._type or "" == "map") defs;
+          mapResults = fold (m: imap (x: l: imap (y: l: l ++ map (value: {
+            inherit value;
+            inherit (m) file;
+          }) (m.value.f x y)) l))
+            (map (d: map (x: []) d.value) nonMaps) maps;
+        in concatLists (imap (n: def: imap (m: def':
           elemType.merge (loc ++ ["[${toString n}-${toString m}]"])
-            [{ inherit (def) file; value = def'; }]) def.value) defs);
+            ([{ inherit (def) file; value = def'; }] ++ elemAt (elemAt mapResults (n - 1)) (m - 1))
+        ) def.value) nonMaps);
       getSubOptions = prefix: elemType.getSubOptions (prefix ++ ["*"]);
+      mappable = true;
     };
 
-    attrsOf = elemType: mkOptionType {
+    attrsOf = elemType: heterogeneousAttrsOf (x: elemType) // {
       name = "attribute set of ${elemType.name}s";
-      check = x: isAttrs x && all elemType.check (attrValues x);
-      merge = loc: defs:
-        zipAttrsWith (name: elemType.merge (loc ++ [name]))
-          # Push down position info.
-          (map (def: listToAttrs (mapAttrsToList (n: def':
-            { name = n; value = { inherit (def) file; value = def'; }; }) def.value)) defs);
-      getSubOptions = prefix: elemType.getSubOptions (prefix ++ ["<name>"]);
     };
 
     heterogeneousAttrsOf = elemTypeFn: mkOptionType {
       name = "attribute set of values of many types, including ${(elemTypeFn "<name>").name}";
       check = x: isAttrs x && all (name: (elemTypeFn name).check (getAttr name x)) (attrNames x);
       merge = loc: defs:
-        zipAttrsWith (name: (elemTypeFn name).merge (loc ++ [name]))
+        let
+          nonMaps = filter (d: d.value._type or "" != "map") defs;
+          maps = filter (d: d.value._type or "" == "map") defs;
+          names = concatMap (d: attrNames d.value) nonMaps;
+          mapResults = listToAttrs (map (name: {
+            inherit name;
+            value = concatMap (m: map (value: {
+              inherit value;
+              inherit (m) file;
+            }) (m.value.f name)) maps;
+          }) names);
+        in zipAttrsWith (name: defs:
+          (elemTypeFn name).merge (loc ++ [name]) (defs ++ (getAttr name mapResults))
+        )
           # Push down position info.
           (map (def: listToAttrs (mapAttrsToList (n: def':
-            { name = n; value = { inherit (def) file; value = def'; }; }) def.value)) defs);
+            { name = n; value = { inherit (def) file; value = def'; }; }) def.value)) nonMaps);
       getSubOptions = prefix: (elemTypeFn "<name>").getSubOptions (prefix ++ ["<name>"]);
+      mappable  = true;
     };
 
     # List or attribute set of ...
@@ -159,6 +178,8 @@ rec {
           else false;
         merge = loc: defs: attrOnly.merge loc (imap convertIfList defs);
         getSubOptions = prefix: elemType.getSubOptions (prefix ++ ["<name?>"]);
+        # maps over the post-convertIfList defs
+        mappable = true;
       };
 
     uniq = elemType: mkOptionType {
