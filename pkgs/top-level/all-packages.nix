@@ -6750,9 +6750,13 @@ let
     gdSupport = true;
   };
 
+  nagios4 = callPackage ../servers/monitoring/nagios/4.x.nix { };
+
   munin = callPackage ../servers/monitoring/munin { };
 
   nagiosPluginsOfficial = callPackage ../servers/monitoring/nagios/plugins/official { };
+
+  nagiosPluginsOfficial2 = callPackage ../servers/monitoring/nagios/plugins/official/2.x.nix { };
 
   net_snmp = callPackage ../servers/monitoring/net-snmp { };
 
