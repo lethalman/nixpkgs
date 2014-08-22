@@ -58,8 +58,8 @@ let
 
   efiImg = pkgs.runCommand "efi-image_eltorito" { buildInputs = [ pkgs.mtools ]; }
     ''
-      #Let's hope 10M is enough
-      dd bs=2048 count=5120 if=/dev/zero of="$out"
+      #Let's hope 20M is enough
+      dd bs=2048 count=10240 if=/dev/zero of="$out"
       ${pkgs.dosfstools}/sbin/mkfs.vfat "$out"
       mcopy -svi "$out" ${efiDir}/* ::
       mmd -i "$out" boot
@@ -199,6 +199,7 @@ in
         device = "/iso/nix-store.squashfs";
         options = "loop";
         neededForBoot = true;
+        mountAfter = [ "/iso" ];
       };
 
     fileSystems."/nix/.rw-store" =
@@ -210,7 +211,8 @@ in
     fileSystems."/nix/store" =
       { fsType = "unionfs-fuse";
         device = "unionfs";
-        options = "allow_other,cow,nonempty,chroot=/mnt-root,max_files=32768,hide_meta_files,dirs=/nix/.rw-store=rw:/nix/.ro-store=ro";
+        options = "allow_other,cow,nonempty,chroot=/sysroot,max_files=32768,hide_meta_files,dirs=/nix/.rw-store=rw:/nix/.ro-store=ro";
+        mountAfter = [ "/nix/.ro-store" "/nix/.rw-store" ];
       };
 
     boot.initrd.availableKernelModules = [ "squashfs" "iso9660" ];

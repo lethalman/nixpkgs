@@ -1,9 +1,35 @@
-{ config, lib, pkgs, ... }:
+{ config, lib, utils, pkgs, ... }:
 
 with lib;
+with utils;
 
 let
   luks = config.boot.initrd.luks;
+
+  extraUtils = config.system.build.extraUtils;
+
+  mkService = { name, device, keyFile, keyFileSize, allowDiscards, ... }: {
+    name = "cryptsetup-${name}";
+    value = {
+      description = "Cryptsetup ${device} on ${name}";
+
+      requires = [ "${escapeSystemdPath device}.device" ];
+      after = [ "${escapeSystemdPath device}.device" ];
+
+      unitConfig = optionalAttrs (keyFile != null) {
+        ConditionPathExists = keyFile;
+      };
+      
+      serviceConfig = {
+        Type = "oneshot";
+        ExecStart = "${extraUtils}/bin/systemd-cryptsetup attach ${name} ${device}"
+          + (if keyFile != null then " ${keyFile}" else " -")
+          + optionalString allowDiscards " allow-discards"
+          + optionalString (keyFileSize != null) " keyfile-size=${toString keyFileSize}";
+        RemainAfterExit = true;
+      };
+    };
+  };
 
   openCommand = { name, device, keyFile, keyFileSize, allowDiscards, yubikey, ... }: ''
     # Wait for luksRoot to appear, e.g. if on a usb drive.
@@ -188,6 +214,7 @@ let
     ''}
   '';
 
+  # Ignored by systemd in initrd
   isPreLVM = f: f.preLVM;
   preLVM = filter isPreLVM luks.devices;
   postLVM = filter (f: !(isPreLVM f)) luks.devices;
@@ -406,9 +433,10 @@ in
     # copy the cryptsetup binary and it's dependencies
     boot.initrd.extraUtilsCommands = ''
       cp -pdv ${pkgs.cryptsetup}/sbin/cryptsetup $out/bin
+      cp -v ${config.boot.initrd.systemd.package}/lib/systemd/systemd-cryptsetup $out/bin
 
-      cp -pdv ${pkgs.libgcrypt}/lib/libgcrypt*.so.* $out/lib
-      cp -pdv ${pkgs.libgpgerror}/lib/libgpg-error*.so.* $out/lib
+      cp -pfdv ${pkgs.libgcrypt}/lib/libgcrypt*.so.* $out/lib
+      cp -pfdv ${pkgs.libgpgerror}/lib/libgpg-error*.so.* $out/lib
       cp -pdv ${pkgs.cryptsetup}/lib/libcryptsetup*.so.* $out/lib
       cp -pdv ${pkgs.popt}/lib/libpopt*.so.* $out/lib
 
@@ -438,6 +466,7 @@ EOF
 
     boot.initrd.extraUtilsCommandsTest = ''
       $out/bin/cryptsetup --version
+      $out/bin/systemd-cryptsetup|grep encrypted
       ${optionalString luks.yubikeySupport ''
         $out/bin/ykchalresp -V
         $out/bin/ykinfo -V
@@ -450,6 +479,9 @@ EOF
       ''}
     '';
 
+    boot.initrd.systemd.services = listToAttrs (map mkService luks.devices);
+
+    # Ignored by systemd in initrd
     boot.initrd.preLVMCommands = concatMapStrings openCommand preLVM;
     boot.initrd.postDeviceCommands = concatMapStrings openCommand postLVM;
 

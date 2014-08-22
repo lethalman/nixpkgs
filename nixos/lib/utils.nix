@@ -6,6 +6,6 @@ rec {
   # becomes dev-xyzzy.  FIXME: slow.
   escapeSystemdPath = s:
    replaceChars ["/" "-" " "] ["-" "\\x2d" "\\x20"]
-    (if hasPrefix "/" s then substring 1 (stringLength s) s else s);
+     (if (hasPrefix "/" s && s != "/") then substring 1 (stringLength s) s else s);
 
 }

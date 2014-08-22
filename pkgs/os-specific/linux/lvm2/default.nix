@@ -2,6 +2,8 @@
 
 let
   version = "2.02.111";
+  # breaks cycle systemd -> cryptsetup -> lvm -> udev
+  udevBootstrap = udev.override { cryptsetup = null; };
 in
 
 stdenv.mkDerivation {
@@ -17,7 +19,7 @@ stdenv.mkDerivation {
       + (stdenv.lib.optionalString enable_dmeventd " --enable-dmeventd")
       ;
 
-  buildInputs = [ pkgconfig udev ];
+  buildInputs = [ pkgconfig udevBootstrap ];
 
   preConfigure =
     ''
@@ -25,7 +27,7 @@ stdenv.mkDerivation {
         --replace /usr/bin/tr ${coreutils}/bin/tr
       substituteInPlace scripts/lvm2_activation_generator_systemd_red_hat.c \
         --replace /usr/sbin/lvm $out/sbin/lvm \
-        --replace /usr/bin/udevadm ${udev}/bin/udevadm
+        --replace /usr/bin/udevadm ${udevBootstrap}/bin/udevadm
 
       sed -i /DEFAULT_SYS_DIR/d Makefile.in
       sed -i /DEFAULT_PROFILE_DIR/d conf/Makefile.in

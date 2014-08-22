@@ -3,9 +3,10 @@
 # the modules necessary to mount the root file system, then calls the
 # init in the root file system to start the second boot stage.
 
-{ config, lib, pkgs, ... }:
+{ config, lib, utils, pkgs, ... }:
 
 with lib;
+with utils;
 
 let
 
@@ -21,7 +22,6 @@ let
     kernel = modulesTree;
     allowMissing = true;
   };
-
 
   # Some additional utilities needed in stage 1, like mount, lvm, fsck
   # etc.  We don't want to bring in all of those packages, so we just
@@ -51,10 +51,15 @@ let
       # Copy BusyBox.
       cp -pvd ${pkgs.busybox}/bin/* ${pkgs.busybox}/sbin/* $out/bin/
 
+      # Use mount from util-linux to simplify filesystem probing
+      rm -f $out/bin/mount
+      cp -pv ${pkgs.utillinux}/bin/mount $out/bin/
+
       # Copy some utillinux stuff.
       cp -vf --remove-destination ${pkgs.utillinux}/sbin/blkid $out/bin
       cp -pdv ${pkgs.utillinux}/lib/libblkid*.so.* $out/lib
       cp -pdv ${pkgs.utillinux}/lib/libuuid*.so.* $out/lib
+      cp -pdv ${pkgs.utillinux}/lib/libmount*.so.* $out/lib
 
       # Copy dmsetup and lvm.
       cp -v ${pkgs.lvm2}/sbin/dmsetup $out/bin/dmsetup
@@ -76,6 +81,9 @@ let
       # Copy modprobe.
       cp -v ${pkgs.kmod}/bin/kmod $out/bin/
       ln -sf kmod $out/bin/modprobe
+
+      # Copy the emergency script.
+      cp -v ${config.boot.initrd.emergencyScript} $out/bin/emergency.sh
 
       ${config.boot.initrd.extraUtilsCommands}
 
@@ -100,7 +108,7 @@ let
       echo "testing patched programs..."
       $out/bin/ash -c 'echo hello world' | grep "hello world"
       export LD_LIBRARY_PATH=$out/lib
-      $out/bin/mount --help 2>&1 | grep "BusyBox"
+      $out/bin/mount --version 2>&1 | grep "util-linux"
       $out/bin/udevadm --version
       $out/bin/dmsetup --version 2>&1 | tee -a log | grep "version:"
       LVM_SYSTEM_DIR=$out $out/bin/lvm version 2>&1 | tee -a log | grep "LVM"
@@ -117,9 +125,11 @@ let
     (fs: fs.neededForBoot || elem fs.mountPoint [ "/" "/nix" "/nix/store" "/var" "/var/log" "/var/lib" "/etc" ])
     (attrValues config.fileSystems);
 
+  autoFileSystems = filter (fs: fs.fsType == "auto") fileSystems;
 
   udevRules = pkgs.stdenv.mkDerivation {
     name = "udev-rules";
+    allowedReferences = [ "out" extraUtils ];
     buildCommand = ''
       mkdir -p $out
 
@@ -130,6 +140,7 @@ let
       cp -v ${udev}/lib/udev/rules.d/80-drivers.rules $out/
       cp -v ${pkgs.lvm2}/lib/udev/rules.d/*.rules $out/
       cp -v ${pkgs.mdadm}/lib/udev/rules.d/*.rules $out/
+      ${config.boot.initrd.extraUdevCommands}
 
       for i in $out/*.rules; do
           substituteInPlace $i \
@@ -176,7 +187,7 @@ let
 
     isExecutable = true;
 
-    inherit udevRules extraUtils modulesClosure busyboxKeymap;
+    inherit extraUtils modulesClosure busyboxKeymap;
 
     inherit (config.boot) resumeDevice devSize runSize;
 
@@ -186,9 +197,6 @@ let
     resumeDevices = map (sd: if sd ? device then sd.device else "/dev/disk/by-label/${sd.label}")
                     (filter (sd: sd ? label || hasPrefix "/dev/" sd.device) config.swapDevices);
 
-    fsInfo =
-      let f = fs: [ fs.mountPoint (if fs.device != null then fs.device else "/dev/disk/by-label/${fs.label}") fs.fsType fs.options ];
-      in pkgs.writeText "initrd-fsinfo" (concatStringsSep "\n" (concatMap f fileSystems));
   };
 
 
@@ -216,7 +224,13 @@ let
           };
           symlink = "/etc/modprobe.d/ubuntu.conf";
         }
-      ];
+        { object = udevRules;
+          symlink = "/etc/udev/rules.d";
+        }
+        { object = pkgs.writeText "initrd-modules" (concatStringsSep "\n" config.boot.initrd.kernelModules);
+          symlink = "/etc/modules-load.d/nixos.conf";
+        }
+      ] ++ config.boot.initrd.extraContents;
   };
 
 in
@@ -302,6 +316,25 @@ in
       '';
     };
 
+    boot.initrd.extraContents = mkOption {
+      internal = true;
+      default = [];
+      type = types.listOf types.attrs;
+      description = ''
+        Additional objects to be added to the initrd.
+      '';
+    };
+
+    boot.initrd.extraUdevCommands = mkOption {
+      internal = true;
+      default = "";
+      type = types.lines;
+      description = ''
+        Shell commands to be executed when installing udev
+        rules in the initrd.
+      '';
+    };
+    
     boot.initrd.compressor = mkOption {
       internal = true;
       default = "gzip -9";
@@ -315,6 +348,22 @@ in
       example = [ "btrfs" ];
       type = types.listOf types.string;
       description = "Names of supported filesystem types in the initial ramdisk.";
+    };
+
+    boot.initrd.emergencyScript = mkOption {
+      default = null;
+      type = types.nullOr types.path;
+      description = ''
+        Script to execute in case of emergency.
+        If not provided, the default script will be used.
+      '';
+      apply = path: pkgs.substituteAll {
+        src = if path == null then ./emergency.sh else path;
+
+        shell = "/bin/ash";
+
+        isExecutable = true;
+      };
     };
 
     fileSystems = mkOption {
@@ -349,6 +398,8 @@ in
     ];
 
     boot.initrd.supportedFilesystems = map (fs: fs.fsType) fileSystems;
+    
+    boot.initrd.systemd.mounts = map (fs: fs.systemdInitrdConfig) fileSystems;
 
   };
 }

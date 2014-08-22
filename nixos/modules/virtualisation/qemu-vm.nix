@@ -281,8 +281,10 @@ in
         cp -vf --remove-destination ${pkgs.e2fsprogs}/sbin/mke2fs $out/bin
       '';
 
-    boot.initrd.postDeviceCommands =
-      ''
+    boot.initrd.systemd.services.vdaDisk = {
+      description = "Setup /dev/vda";
+      
+      script = ''
         # If the disk image appears to be empty, run mke2fs to
         # initialise.
         FSTYPE=$(blkid -o value -s TYPE /dev/vda || true)
@@ -291,17 +293,35 @@ in
         fi
       '';
 
-    boot.initrd.postMountCommands =
-      ''
+      requiredBy = [ "sysroot.mount" ];
+      serviceConfig = {
+        Type = "oneshot";
+        RemainAfterExit = true;
+      };
+    };
+
+    boot.initrd.systemd.services.setupRoot = {
+      description = "Setup new root";
+      
+      script = ''
         # Mark this as a NixOS machine.
-        mkdir -p $targetRoot/etc
-        echo -n > $targetRoot/etc/NIXOS
+        mkdir -p /sysroot/etc
+        echo -n > /sysroot/etc/NIXOS
 
         # Fix the permissions on /tmp.
-        chmod 1777 $targetRoot/tmp
+        chmod 1777 /sysroot/tmp
 
-        mkdir -p $targetRoot/boot
+        mkdir -p /sysroot/boot
       '';
+
+      wantedBy = [ "initrd.target" ];
+      before = [ "initrd.target" ];
+      after = [ "initrd-root-fs.target" ];
+      serviceConfig = {
+        Type = "oneshot";
+        RemainAfterExit = true;
+      };
+    };
 
     # After booting, register the closure of the paths in
     # `virtualisation.pathsInNixDB' in the Nix database in the VM.  This
@@ -351,7 +371,7 @@ in
       { "/nix/store" =
           { fsType = "unionfs-fuse";
             device = "unionfs";
-            options = "allow_other,cow,nonempty,chroot=/mnt-root,max_files=32768,hide_meta_files,dirs=/nix/.rw-store=rw:/nix/.ro-store=ro";
+            options = "allow_other,cow,nonempty,chroot=/sysroot,max_files=32768,hide_meta_files,dirs=/nix/.rw-store=rw:/nix/.ro-store=ro";
           };
       } // optionalAttrs (cfg.writableStore && cfg.writableStoreUseTmpfs)
       { "/nix/.rw-store" =
