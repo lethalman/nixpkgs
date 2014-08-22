@@ -3,9 +3,10 @@
 # the modules necessary to mount the root file system, then calls the
 # init in the root file system to start the second boot stage.
 
-{ config, lib, pkgs, ... }:
+{ config, lib, utils, pkgs, ... }:
 
 with lib;
+with utils;
 
 let
 
@@ -22,6 +23,13 @@ let
     allowMissing = true;
   };
 
+  fsprobeScript = pkgs.substituteAll {
+    src = ./systemd-fsprobe.sh;
+
+    shell = "/bin/ash";
+
+    isExecutable = true;
+  };
 
   # Some additional utilities needed in stage 1, like mount, lvm, fsck
   # etc.  We don't want to bring in all of those packages, so we just
@@ -75,6 +83,12 @@ let
       cp -v ${pkgs.kmod}/bin/kmod $out/bin/
       ln -sf kmod $out/bin/modprobe
 
+      # Copy the emergency script.
+      cp -v ${config.boot.initrd.emergencyScript} $out/bin/emergency.sh
+
+      # Copy our systemd-fsprobe util
+      cp -v ${fsprobeScript} $out/bin/systemd-fsprobe
+
       ${config.boot.initrd.extraUtilsCommands}
 
       # Strip binaries further than normal.
@@ -115,9 +129,11 @@ let
     (fs: fs.neededForBoot || elem fs.mountPoint [ "/" "/nix" "/nix/store" "/var" "/var/log" "/var/lib" "/etc" ])
     (attrValues config.fileSystems);
 
+  autoFileSystems = filter (fs: fs.fsType == "auto") fileSystems;
 
   udevRules = pkgs.stdenv.mkDerivation {
     name = "udev-rules";
+    allowedReferences = [ "out" extraUtils ];
     buildCommand = ''
       mkdir -p $out
 
@@ -128,6 +144,7 @@ let
       cp -v ${udev}/lib/udev/rules.d/80-drivers.rules $out/
       cp -v ${pkgs.lvm2}/lib/udev/rules.d/*.rules $out/
       cp -v ${pkgs.mdadm}/lib/udev/rules.d/*.rules $out/
+      ${config.boot.initrd.extraUdevCommands}
 
       for i in $out/*.rules; do
           substituteInPlace $i \
@@ -174,7 +191,7 @@ let
 
     isExecutable = true;
 
-    inherit udevRules extraUtils modulesClosure busyboxKeymap;
+    inherit extraUtils modulesClosure busyboxKeymap;
 
     inherit (config.boot) resumeDevice devSize runSize;
 
@@ -184,9 +201,6 @@ let
     resumeDevices = map (sd: if sd ? device then sd.device else "/dev/disk/by-label/${sd.label}")
                     (filter (sd: sd ? label || hasPrefix "/dev/" sd.device) config.swapDevices);
 
-    fsInfo =
-      let f = fs: [ fs.mountPoint (if fs.device != null then fs.device else "/dev/disk/by-label/${fs.label}") fs.fsType fs.options ];
-      in pkgs.writeText "initrd-fsinfo" (concatStringsSep "\n" (concatMap f fileSystems));
   };
 
 
@@ -214,7 +228,13 @@ let
           };
           symlink = "/etc/modprobe.d/ubuntu.conf";
         }
-      ];
+        { object = udevRules;
+          symlink = "/etc/udev/rules.d";
+        }
+        { object = pkgs.writeText "initrd-modules" (concatStringsSep "\n" config.boot.initrd.kernelModules);
+          symlink = "/etc/modules-load.d/nixos.conf";
+        }
+      ] ++ config.boot.initrd.extraContents;
   };
 
 in
@@ -300,6 +320,25 @@ in
       '';
     };
 
+    boot.initrd.extraContents = mkOption {
+      internal = true;
+      default = [];
+      type = types.listOf types.attrs;
+      description = ''
+        Additional objects to be added to the initrd.
+      '';
+    };
+
+    boot.initrd.extraUdevCommands = mkOption {
+      internal = true;
+      default = "";
+      type = types.lines;
+      description = ''
+        Shell commands to be executed when installing udev
+        rules in the initrd.
+      '';
+    };
+    
     boot.initrd.compressor = mkOption {
       internal = true;
       default = "gzip -9";
@@ -313,6 +352,22 @@ in
       example = [ "btrfs" ];
       type = types.listOf types.string;
       description = "Names of supported filesystem types in the initial ramdisk.";
+    };
+
+    boot.initrd.emergencyScript = mkOption {
+      default = null;
+      type = types.nullOr types.path;
+      description = ''
+        Script to execute in case of emergency.
+        If not provided, the default script will be used.
+      '';
+      apply = path: pkgs.substituteAll {
+        src = if path == null then ./emergency.sh else path;
+
+        shell = "/bin/ash";
+
+        isExecutable = true;
+      };
     };
 
     fileSystems = mkOption {
@@ -347,6 +402,39 @@ in
     ];
 
     boot.initrd.supportedFilesystems = map (fs: fs.fsType) fileSystems;
+    
+    # Probe filesystems type
+    boot.initrd.systemd.services = listToAttrs (map (fs:
+    {
+      name = "fsprobe-${escapeSystemdPath fs.device}";
+      value = {
+        description = "Probe ${fs.device} filesystem";
+
+        wants = [ "${escapeSystemdPath fs.device}.device" ];
+        before = [ "${escapeSystemdPath fs.device}.device" ];
+        
+        serviceConfig = {
+          Type = "oneshot";
+          ExecStart = "${extraUtils}/bin/systemd-fsprobe ${fs.device} ${escapeSystemdPath fs.systemdInitrdConfig.where}";
+          RemainAfterExit = true;
+        };
+      };
+    }) autoFileSystems) //
+    {
+      # Reload configuration after filesystem probing
+      fsprobe-systemd-reload = {
+        wants = map (fs: "fsprobe-${escapeSystemdPath fs.device}.service") autoFileSystems;
+        after = map (fs: "fsprobe-${escapeSystemdPath fs.device}.service") autoFileSystems;
+        
+        serviceConfig = {
+          Type = "oneshot";
+          ExecStart = "${extraUtils}/bin/systemctl daemon-reload";
+          RemainAfterExit = true;
+        };
+      };
+    };
+
+    boot.initrd.systemd.mounts = map (fs: fs.systemdInitrdConfig) fileSystems;
 
   };
 }

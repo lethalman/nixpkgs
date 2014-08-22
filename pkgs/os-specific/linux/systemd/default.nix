@@ -3,7 +3,7 @@
 , glib, kbd, libxslt, coreutils, libgcrypt, sysvtools, docbook_xsl
 , kexectools, libmicrohttpd, linuxHeaders
 , pythonPackages ? null, pythonSupport ? false
-, autoreconfHook
+, autoreconfHook, targetInitrd ? false
 }:
 
 assert stdenv.isLinux;
@@ -48,9 +48,10 @@ stdenv.mkDerivation rec {
       "--disable-networkd" # enable/use eventually
       "--enable-compat-libs" # get rid of this eventually
       "--disable-tests"
-    ];
+    ] ++ stdenv.lib.optional (targetInitrd) "--disable-pam";
 
-  preConfigure =
+  # For initrd we refer to /bin and /sbin to minimize the size of the ramfs.
+  preConfigure = stdenv.lib.optionalString (!targetInitrd)
     ''
       # FIXME: patch this in systemd properly (and send upstream).
       # FIXME: use sulogin from util-linux once updated.
@@ -74,8 +75,10 @@ stdenv.mkDerivation rec {
 
   # This is needed because systemd uses the gold linker, which doesn't
   # yet have the wrapper script to add rpath flags automatically.
-  NIX_LDFLAGS = "-rpath ${pam}/lib -rpath ${libcap}/lib -rpath ${acl}/lib -rpath ${stdenv.gcc.gcc}/lib";
 
+  NIX_LDFLAGS = (stdenv.lib.optionalString (!targetInitrd) "-rpath ${pam}/lib ")
+                + "-rpath ${libcap}/lib -rpath ${acl}/lib -rpath ${stdenv.gcc.gcc}/lib";
+  
   PYTHON_BINARY = "${coreutils}/bin/env python"; # don't want a build time dependency on Python
 
   NIX_CFLAGS_COMPILE =

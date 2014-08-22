@@ -1,9 +1,10 @@
 # This module allows the test driver to connect to the virtual machine
 # via a root shell attached to port 514.
 
-{ config, lib, pkgs, ... }:
+{ config, lib, pkgs, utils, ... }:
 
 with lib;
+with utils;
 
 let kernel = config.boot.kernelPackages.kernel; in
 
@@ -38,15 +39,22 @@ let kernel = config.boot.kernelPackages.kernel; in
     systemd.services."serial-getty@ttyS0".enable = false;
     systemd.services."serial-getty@hvc0".enable = false;
 
-    boot.initrd.postDeviceCommands =
-      ''
-        # Using acpi_pm as a clock source causes the guest clock to
-        # slow down under high host load.  This is usually a bad
-        # thing, but for VM tests it should provide a bit more
-        # determinism (e.g. if the VM runs at lower speed, then
-        # timeouts in the VM should also be delayed).
-        echo acpi_pm > /sys/devices/system/clocksource/clocksource0/current_clocksource
-      '';
+    # Using acpi_pm as a clock source causes the guest clock to
+    # slow down under high host load.  This is usually a bad
+    # thing, but for VM tests it should provide a bit more
+    # determinism (e.g. if the VM runs at lower speed, then
+    # timeouts in the VM should also be delayed).
+    boot.initrd.systemd.services.acpi_pm = {
+      description = "Set clock source to acpi_pm";
+      wantedBy = [ "initrd.target" ];
+      before = [ "initrd.target" ];
+      after = [ (utils.escapeSystemdPath "/sys/devices/system/clocksource/clocksource0.device") ];
+      serviceConfig = {
+        Type = "oneshot";
+        RemainAfterExit = true;
+        ExecStart = "/bin/echo acpi_pm > /sys/devices/system/clocksource/clocksource0/current_clocksource";
+      };
+    };
 
     boot.postBootCommands =
       ''

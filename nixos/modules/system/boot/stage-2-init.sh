@@ -59,7 +59,6 @@ if [ -n "@readOnlyStore@" ]; then
     fi
 fi
 
-
 # Provide a /etc/mtab.
 mkdir -m 0755 -p /etc
 test -e /etc/fstab || touch /etc/fstab # to shut up mount
@@ -83,8 +82,10 @@ done
 
 
 # More special file systems, initialise required directories.
-mkdir -m 0755 /dev/shm
-mount -t tmpfs -o "rw,nosuid,nodev,size=@devShmSize@" tmpfs /dev/shm
+if ! mountpoint -q /dev/shm; then
+    mkdir -p -m 0755 /dev/shm || true
+    mount -t tmpfs -o "rw,nosuid,nodev,size=@devShmSize@" tmpfs /dev/shm
+fi
 mkdir -m 0755 -p /dev/pts
 [ -e /proc/bus/usb ] && mount -t usbfs usbfs /proc/bus/usb # UML doesn't have USB by default
 mkdir -m 01777 -p /tmp
@@ -98,7 +99,7 @@ mkdir -m 0755 -p /etc/nixos
 
 # Miscellaneous boot time cleanup.
 rm -rf /var/run /var/lock
-rm -f /etc/{group,passwd,shadow}.lock
+rm -f /etc/{group,passwd,shadow,gshadow}.lock
 
 
 # Also get rid of temporary GC roots.
@@ -111,6 +112,9 @@ if ! mountpoint -q /run; then
     rm -rf /run
     mkdir -m 0755 -p /run
     mount -t tmpfs -o "mode=0755,size=@runSize@" tmpfs /run
+else
+	# Cleanup old systemd state
+	rm -rf /run/*
 fi
 
 # Create a ramfs on /run/keys to hold secrets that shouldn't be
@@ -175,7 +179,6 @@ ln -sfn /run/booted-system /nix/var/nix/gcroots/booted-system
 
 # Run any user-specified commands.
 @shell@ @postBootCommands@
-
 
 # Start systemd.
 echo "starting systemd..."

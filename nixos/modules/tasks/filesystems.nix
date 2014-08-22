@@ -2,6 +2,7 @@
 
 with lib;
 with utils;
+with import ../system/boot/systemd-unit-options.nix { inherit config lib; };
 
 let
 
@@ -64,11 +65,65 @@ let
         description = "Disable running fsck on this filesystem.";
       };
 
+      mountBefore = mkOption {
+        default = [];
+        type = types.listOf types.str;
+        description = "Mount this file system before the listed file systems.";
+      };
+
+      mountAfter = mkOption {
+        default = [];
+        type = types.listOf types.str;
+        description = "Mount this file system after the listed file systems.";
+      };
+
+      systemdConfig = mkOption {
+        type = types.nullOr (types.submodule { options = mountOptions; });
+        description = "Additional configuration for the systemd mount";
+      };
+
+      systemdInitrdConfig = mkOption {
+        type = types.nullOr (types.submodule { options = mountOptions; });
+        description = "Additional configuration for the initrd mount";
+      };
+      
     };
 
     config = {
       mountPoint = mkDefault name;
       device = mkIf (config.fsType == "tmpfs") (mkDefault config.fsType);
+
+      systemdConfig = {
+        wantedBy = map (x: "${escapeSystemdPath x}.mount") config.mountBefore;
+        before = map (x: "${escapeSystemdPath x}.mount") config.mountBefore;
+
+        wants = map (x: "${escapeSystemdPath x}.mount") config.mountAfter;
+        after = map (x: "${escapeSystemdPath x}.mount") config.mountAfter;
+
+        what = config.device;
+        where = config.mountPoint;
+        type = config.fsType;
+        options = config.options;
+      };
+
+      systemdInitrdConfig = {
+        wantedBy = map (x: escapeSystemdPath "/sysroot/${x}.mount") config.mountBefore;
+        requiredBy = if config.mountPoint == "/" then [ "initrd-root-fs.target" ] else [ "initrd-fs.target" ];
+        before = (map (x: escapeSystemdPath "/sysroot/${x}.mount") config.mountBefore)
+          ++ (if config.mountPoint == "/" then [ "initrd-root-fs.target" ] else [ "initrd-fs.target" ]);
+
+        wants = map (x: "sysroot-${escapeSystemdPath x}.mount") config.mountAfter
+          ++ optional (config.fsType == "auto") "fsprobe-systemd-reload.service";
+        after = map (x: "sysroot-${escapeSystemdPath x}.mount") config.mountAfter
+          ++ optional (config.fsType == "auto") "fsprobe-systemd-reload.service";
+
+        where = if config.mountPoint == "/" then "/sysroot" else "/sysroot${config.mountPoint}";
+        what = if hasPrefix "/" config.device && !(hasPrefix "/dev" config.device) then "/sysroot/${config.device}" # for bind mounts
+               else config.device;
+        type = config.fsType;
+        options = config.options;
+      };
+      
     };
 
   };
@@ -204,6 +259,9 @@ in
           };
 
       in listToAttrs (map formatDevice (filter (fs: fs.autoFormat) fileSystems));
+
+    # Emit a .mount for each mount point
+    systemd.mounts = map (x: x.systemdConfig) fileSystems;
 
   };
 
