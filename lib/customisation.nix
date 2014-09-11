@@ -5,6 +5,12 @@ in
 
 rec {
 
+  overridableAttrs = f:
+    let attrs = f attrs;
+    in attrs // {
+      overrideAttrs = f':
+        overridableAttrs (self: f self // f' (f self) self);
+    };
 
   /* `overrideDerivation drv f' takes a derivation (i.e., the result
      of a call to the builtin function `derivation') and returns a new
