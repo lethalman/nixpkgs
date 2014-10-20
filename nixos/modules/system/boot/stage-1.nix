@@ -411,7 +411,7 @@ in
         description = "Probe ${fs.device} filesystem";
 
         wants = [ "${escapeSystemdPath fs.device}.device" ];
-        before = [ "${escapeSystemdPath fs.device}.device" ];
+        after = [ "${escapeSystemdPath fs.device}.device" ];
         
         serviceConfig = {
           Type = "oneshot";

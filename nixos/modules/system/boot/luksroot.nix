@@ -1,9 +1,29 @@
-{ config, lib, pkgs, ... }:
+{ config, lib, utils, pkgs, ... }:
 
 with lib;
+with utils;
 
 let
   luks = config.boot.initrd.luks;
+
+  extraUtils = config.system.build.extraUtils;
+
+  mkService = { name, device, keyFile, keyFileSize, allowDiscards, ... }: {
+    name = "cryptsetup-${name}";
+    value = {
+      description = "Setup crypto device ${device} mapped to ${name}";
+
+      requires = [ "${escapeSystemdPath device}.device" ];
+      after = [ "${escapeSystemdPath device}.device" ];
+
+      serviceConfig = {
+        Type = "oneshot";
+        ExecStart = ''${extraUtils}/bin/cryptsetup luksOpen ${device} ${name} ${optionalString allowDiscards "--allow-discards"} \
+          ${optionalString (keyFile != null) "--key-file=${keyFile} ${optionalString (keyFileSize != null) "--keyfile-size=${toString keyFileSize}"}"}'';
+        RemainAfterExit = true;
+      };
+    };
+  };
 
   openCommand = { name, device, keyFile, keyFileSize, allowDiscards, yubikey, ... }: ''
     # Wait for luksRoot to appear, e.g. if on a usb drive.
@@ -188,6 +208,7 @@ let
     ''}
   '';
 
+  # Ignored by systemd in initrd
   isPreLVM = f: f.preLVM;
   preLVM = filter isPreLVM luks.devices;
   postLVM = filter (f: !(isPreLVM f)) luks.devices;
@@ -407,8 +428,8 @@ in
     boot.initrd.extraUtilsCommands = ''
       cp -pdv ${pkgs.cryptsetup}/sbin/cryptsetup $out/bin
 
-      cp -pdv ${pkgs.libgcrypt}/lib/libgcrypt*.so.* $out/lib
-      cp -pdv ${pkgs.libgpgerror}/lib/libgpg-error*.so.* $out/lib
+      cp -pfdv ${pkgs.libgcrypt}/lib/libgcrypt*.so.* $out/lib
+      cp -pfdv ${pkgs.libgpgerror}/lib/libgpg-error*.so.* $out/lib
       cp -pdv ${pkgs.cryptsetup}/lib/libcryptsetup*.so.* $out/lib
       cp -pdv ${pkgs.popt}/lib/libpopt*.so.* $out/lib
 
@@ -450,6 +471,9 @@ EOF
       ''}
     '';
 
+    boot.initrd.systemd.services = listToAttrs (map mkService luks.devices);
+
+    # Ignored by systemd in initrd
     boot.initrd.preLVMCommands = concatMapStrings openCommand preLVM;
     boot.initrd.postDeviceCommands = concatMapStrings openCommand postLVM;
 
