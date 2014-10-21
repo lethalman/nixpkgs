@@ -11,13 +11,14 @@ let
   mkService = { name, device, keyFile, keyFileSize, allowDiscards, ... }: {
     name = "cryptsetup-${name}";
     value = {
-      description = "Setup crypto device ${device} mapped to ${name}";
+      description = "Cryptsetup device ${device} mapped to ${name}";
 
       requires = [ "${escapeSystemdPath device}.device" ];
       after = [ "${escapeSystemdPath device}.device" ];
 
       serviceConfig = {
         Type = "oneshot";
+        ConditionPathExists = keyFile;
         ExecStart = ''${extraUtils}/bin/cryptsetup luksOpen ${device} ${name} ${optionalString allowDiscards "--allow-discards"} \
           ${optionalString (keyFile != null) "--key-file=${keyFile} ${optionalString (keyFileSize != null) "--keyfile-size=${toString keyFileSize}"}"}'';
         RemainAfterExit = true;

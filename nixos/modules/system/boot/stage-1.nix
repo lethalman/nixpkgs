@@ -23,14 +23,6 @@ let
     allowMissing = true;
   };
 
-  fsprobeScript = pkgs.substituteAll {
-    src = ./systemd-fsprobe.sh;
-
-    shell = "/bin/ash";
-
-    isExecutable = true;
-  };
-
   # Some additional utilities needed in stage 1, like mount, lvm, fsck
   # etc.  We don't want to bring in all of those packages, so we just
   # copy what we need.  Instead of using statically linked binaries,
@@ -57,10 +49,15 @@ let
       # Copy BusyBox.
       cp -pvd ${pkgs.busybox}/bin/* ${pkgs.busybox}/sbin/* $out/bin/
 
+      # Use mount from util-linux to simplify filesystem probing
+      rm -f $out/bin/mount
+      cp -pv ${pkgs.utillinux}/bin/mount $out/bin/
+
       # Copy some utillinux stuff.
       cp -vf --remove-destination ${pkgs.utillinux}/sbin/blkid $out/bin
       cp -pdv ${pkgs.utillinux}/lib/libblkid*.so.* $out/lib
       cp -pdv ${pkgs.utillinux}/lib/libuuid*.so.* $out/lib
+      cp -pdv ${pkgs.utillinux}/lib/libmount*.so.* $out/lib
 
       # Copy dmsetup and lvm.
       cp -v ${pkgs.lvm2}/sbin/dmsetup $out/bin/dmsetup
@@ -86,9 +83,6 @@ let
       # Copy the emergency script.
       cp -v ${config.boot.initrd.emergencyScript} $out/bin/emergency.sh
 
-      # Copy our systemd-fsprobe util
-      cp -v ${fsprobeScript} $out/bin/systemd-fsprobe
-
       ${config.boot.initrd.extraUtilsCommands}
 
       # Strip binaries further than normal.
@@ -112,7 +106,7 @@ let
       echo "testing patched programs..."
       $out/bin/ash -c 'echo hello world' | grep "hello world"
       export LD_LIBRARY_PATH=$out/lib
-      $out/bin/mount --help 2>&1 | grep "BusyBox"
+      $out/bin/mount --version 2>&1 | grep "util-linux"
       $out/bin/udevadm --version
       $out/bin/dmsetup --version 2>&1 | tee -a log | grep "version:"
       LVM_SYSTEM_DIR=$out $out/bin/lvm version 2>&1 | tee -a log | grep "LVM"
@@ -403,37 +397,6 @@ in
 
     boot.initrd.supportedFilesystems = map (fs: fs.fsType) fileSystems;
     
-    # Probe filesystems type
-    boot.initrd.systemd.services = listToAttrs (map (fs:
-    {
-      name = "fsprobe-${escapeSystemdPath fs.device}";
-      value = {
-        description = "Probe ${fs.device} filesystem";
-
-        wants = [ "${escapeSystemdPath fs.device}.device" ];
-        after = [ "${escapeSystemdPath fs.device}.device" ];
-        
-        serviceConfig = {
-          Type = "oneshot";
-          ExecStart = "${extraUtils}/bin/systemd-fsprobe ${fs.device} ${escapeSystemdPath fs.systemdInitrdConfig.where}";
-          RemainAfterExit = true;
-        };
-      };
-    }) autoFileSystems) //
-    {
-      # Reload configuration after filesystem probing
-      fsprobe-systemd-reload = {
-        wants = map (fs: "fsprobe-${escapeSystemdPath fs.device}.service") autoFileSystems;
-        after = map (fs: "fsprobe-${escapeSystemdPath fs.device}.service") autoFileSystems;
-        
-        serviceConfig = {
-          Type = "oneshot";
-          ExecStart = "${extraUtils}/bin/systemctl daemon-reload";
-          RemainAfterExit = true;
-        };
-      };
-    };
-
     boot.initrd.systemd.mounts = map (fs: fs.systemdInitrdConfig) fileSystems;
 
   };

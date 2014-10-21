@@ -112,10 +112,8 @@ let
         before = (map (x: escapeSystemdPath "/sysroot/${x}.mount") config.mountBefore)
           ++ (if config.mountPoint == "/" then [ "initrd-root-fs.target" ] else [ "initrd-fs.target" ]);
 
-        wants = map (x: "sysroot-${escapeSystemdPath x}.mount") config.mountAfter
-          ++ optional (config.fsType == "auto") "fsprobe-systemd-reload.service";
-        after = map (x: "sysroot-${escapeSystemdPath x}.mount") config.mountAfter
-          ++ optional (config.fsType == "auto") "fsprobe-systemd-reload.service";
+        wants = map (x: "sysroot-${escapeSystemdPath x}.mount") config.mountAfter;
+        after = map (x: "sysroot-${escapeSystemdPath x}.mount") config.mountAfter;
 
         where = if config.mountPoint == "/" then "/sysroot" else "/sysroot${config.mountPoint}";
         what = if hasPrefix "/" config.device && !(hasPrefix "/dev" config.device) then "/sysroot/${config.device}" # for bind mounts

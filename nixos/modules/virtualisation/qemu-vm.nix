@@ -294,7 +294,6 @@ in
       '';
 
       requiredBy = [ "sysroot.mount" ];
-      before = [ "sysroot.mount" "fsprobe-dev-vda.service" ];
       serviceConfig = {
         Type = "oneshot";
         RemainAfterExit = true;
