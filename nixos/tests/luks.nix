@@ -1,9 +1,18 @@
+# The interactive version will ask for the passphrase (lukspass),
+# instead of using keyfiles.
+#
+# Test it with:
+# nix-build nixos/tests/luks.nix -A driver --arg interactive true
+# result/bin/nixos-run-vms
+
+{ interactive ? false, ... }@args:
+
 import ./make-test.nix {
   name = "simple";
 
   machine = { config, pkgs, lib, ... }: with lib; {
     boot.initrd.luks.devices = mkOverride 9 [
-      { name = "luksroot"; device = "/dev/vda"; keyFile = "/run/lukskey"; }
+      ({ name = "luksroot"; device = "/dev/vda"; } // (optionalAttrs (!interactive) { keyFile = "/run/lukskey"; }))
     ];
 
     # Create a luks device named luksroot formatted as ext4
@@ -16,6 +25,7 @@ import ./make-test.nix {
         fi
         
         cryptsetup luksOpen /dev/vda luksroot --key-file /run/lukskey-create
+        echo lukspass|cryptsetup luksAddKey /dev/vda -d /run/lukskey-create
         rm -f /run/lukskey-create
 
         FSTYPE=$(blkid -o value -s TYPE /dev/mapper/luksroot || true)
@@ -65,4 +75,4 @@ import ./make-test.nix {
       $machine->waitForUnit("multi-user.target");
       $machine->shutdown;
     '';
-}
+} args

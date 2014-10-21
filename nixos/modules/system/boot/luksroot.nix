@@ -16,7 +16,7 @@ let
       requires = [ "${escapeSystemdPath device}.device" ];
       after = [ "${escapeSystemdPath device}.device" ];
 
-      unitConfig = {
+      unitConfig = optionalAttrs (keyFile != null) {
         ConditionPathExists = keyFile;
       };
       
