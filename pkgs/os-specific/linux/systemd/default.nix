@@ -27,10 +27,11 @@ stdenv.mkDerivation rec {
 
   buildInputs =
     [ pkgconfig intltool gperf libcap kmod xz pam acl
-      /* cryptsetup */ libuuid m4 glib libxslt libgcrypt docbook_xsl
+      cryptsetup libuuid m4 glib libxslt libgcrypt docbook_xsl
       libmicrohttpd linuxHeaders
       autoreconfHook
-    ] ++ stdenv.lib.optionals pythonSupport [pythonPackages.python pythonPackages.lxml];
+    ] ++ stdenv.lib.optionals pythonSupport [pythonPackages.python pythonPackages.lxml]
+      ++ stdenv.lib.optional (cryptsetup != null) cryptsetup;
 
   configureFlags =
     [ "--localstatedir=/var"
