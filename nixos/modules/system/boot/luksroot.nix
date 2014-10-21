@@ -11,16 +11,21 @@ let
   mkService = { name, device, keyFile, keyFileSize, allowDiscards, ... }: {
     name = "cryptsetup-${name}";
     value = {
-      description = "Cryptsetup device ${device} mapped to ${name}";
+      description = "Cryptsetup ${device} on ${name}";
 
       requires = [ "${escapeSystemdPath device}.device" ];
       after = [ "${escapeSystemdPath device}.device" ];
 
+      unitConfig = {
+        ConditionPathExists = keyFile;
+      };
+      
       serviceConfig = {
         Type = "oneshot";
-        ConditionPathExists = keyFile;
-        ExecStart = ''${extraUtils}/bin/cryptsetup luksOpen ${device} ${name} ${optionalString allowDiscards "--allow-discards"} \
-          ${optionalString (keyFile != null) "--key-file=${keyFile} ${optionalString (keyFileSize != null) "--keyfile-size=${toString keyFileSize}"}"}'';
+        ExecStart = "${extraUtils}/bin/systemd-cryptsetup attach ${name} ${device}"
+          + (if keyFile != null then " ${keyFile}" else " -")
+          + optionalString allowDiscards " allow-discards"
+          + optionalString (keyFileSize != null) " keyfile-size=${toString keyFileSize}";
         RemainAfterExit = true;
       };
     };
@@ -428,6 +433,7 @@ in
     # copy the cryptsetup binary and it's dependencies
     boot.initrd.extraUtilsCommands = ''
       cp -pdv ${pkgs.cryptsetup}/sbin/cryptsetup $out/bin
+      cp -v ${config.boot.initrd.systemd.package}/lib/systemd/systemd-cryptsetup $out/bin
 
       cp -pfdv ${pkgs.libgcrypt}/lib/libgcrypt*.so.* $out/lib
       cp -pfdv ${pkgs.libgpgerror}/lib/libgpg-error*.so.* $out/lib
@@ -460,6 +466,7 @@ EOF
 
     boot.initrd.extraUtilsCommandsTest = ''
       $out/bin/cryptsetup --version
+      $out/bin/systemd-cryptsetup|grep encrypted
       ${optionalString luks.yubikeySupport ''
         $out/bin/ykchalresp -V
         $out/bin/ykinfo -V

@@ -32,7 +32,8 @@ mkdir -p /etc
 touch /etc/initrd-release # let systemd know it's running in initrd
 touch /etc/machine-id # let systemd know /etc is not empty
 touch /etc/fstab # to shut up mount
-ln -s /proc/mounts /etc/mtab # needed by systemd
+rm -f /etc/mtab
+ln -sf /proc/self/mounts /etc/mtab # to shut up mount
 
 echo @extraUtils@/bin/modprobe > /proc/sys/kernel/modprobe
 
