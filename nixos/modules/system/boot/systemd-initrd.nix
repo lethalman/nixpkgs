@@ -535,6 +535,7 @@ in
       cp -v ${systemd}/lib/systemd/systemd-vconsole-setup $out/bin
       cp -v ${systemd}/bin/systemctl $out/bin
       cp -v ${systemd}/bin/journalctl $out/bin
+      cp -v ${systemd}/bin/systemd-run $out/bin
       cp -v ${systemd}/bin/systemd-tty-ask-password-agent $out/bin
       cp -v ${pkgs.libcap}/lib/libcap.so.* $out/lib
       cp -v ${pkgs.lzma}/lib/liblzma.so.* $out/lib

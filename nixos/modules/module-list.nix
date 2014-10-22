@@ -349,6 +349,7 @@
   ./system/boot/loader/init-script/init-script.nix
   ./system/boot/loader/raspberrypi/raspberrypi.nix
   ./system/boot/luksroot.nix
+  ./system/boot/lvm.nix
   ./system/boot/modprobe.nix
   ./system/boot/shutdown.nix
   ./system/boot/stage-1.nix

@@ -14,8 +14,10 @@ with utils;
   # to the *boot time* of the host).
   boot.initrd.systemd.services.hwclockBug = {
 	  description = "Workaround kvm hwclock bug";
-    wantedBy = [ "initrd.target" ];
-    before = [ "initrd.target" ];
+
+    wantedBy = [ "basic.target" ];
+    before = [ "default.target" ];
+
     serviceConfig = {
       Type = "oneshot";
       RemainAfterExit = true;

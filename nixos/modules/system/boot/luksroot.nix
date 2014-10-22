@@ -26,6 +26,7 @@ let
           + (if keyFile != null then " ${keyFile}" else " -")
           + optionalString allowDiscards " allow-discards"
           + optionalString (keyFileSize != null) " keyfile-size=${toString keyFileSize}";
+		ExecStop = "${extraUtils}/bin/systemd-cryptsetup detach ${name}";
         RemainAfterExit = true;
       };
     };
@@ -214,11 +215,6 @@ let
     ''}
   '';
 
-  # Ignored by systemd in initrd
-  isPreLVM = f: f.preLVM;
-  preLVM = filter isPreLVM luks.devices;
-  postLVM = filter (f: !(isPreLVM f)) luks.devices;
-
 in
 {
 
@@ -252,7 +248,7 @@ in
 
     boot.initrd.luks.devices = mkOption {
       default = [ ];
-      example = [ { name = "luksroot"; device = "/dev/sda3"; preLVM = true; } ];
+      example = [ { name = "luksroot"; device = "/dev/sda3"; } ];
       description = ''
         The list of devices that should be decrypted using LUKS before trying to mount the
         root partition. This works for both LVM-over-LUKS and LUKS-over-LVM setups.
@@ -300,12 +296,6 @@ in
             <literal>keyFile</literal> will be used decryption, instead of just
             the first <literal>keyFileSize</literal> bytes.
           '';
-        };
-
-        preLVM = mkOption {
-          default = true;
-          type = types.bool;
-          description = "Whether the luksOpen will be attempted before LVM scan or after it.";
         };
 
         allowDiscards = mkOption {
@@ -479,11 +469,9 @@ EOF
       ''}
     '';
 
-    boot.initrd.systemd.services = listToAttrs (map mkService luks.devices);
+    boot.initrd.lvm.enable = mkForce true; # really depends on lvm
 
-    # Ignored by systemd in initrd
-    boot.initrd.preLVMCommands = concatMapStrings openCommand preLVM;
-    boot.initrd.postDeviceCommands = concatMapStrings openCommand postLVM;
+    boot.initrd.systemd.services = listToAttrs (map mkService luks.devices);
 
     environment.systemPackages = [ pkgs.cryptsetup ];
   };

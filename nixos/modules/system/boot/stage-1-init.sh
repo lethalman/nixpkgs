@@ -36,6 +36,7 @@ rm -f /etc/mtab
 ln -sf /proc/self/mounts /etc/mtab # to shut up mount
 
 echo @extraUtils@/bin/modprobe > /proc/sys/kernel/modprobe
+echo > /sys/kernel/uevent_helper # /sbin/hotplug
 
 # Process the kernel command line.
 for o in $(cat /proc/cmdline); do

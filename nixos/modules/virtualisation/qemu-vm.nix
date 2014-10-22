@@ -293,7 +293,12 @@ in
         fi
       '';
 
-      requiredBy = [ "sysroot.mount" ];
+      wantedBy = [ "basic.target" ];
+      before = [ "sysroot.mount" ];
+      
+      requires = [ "dev-vda.device" ];
+      after = [ "dev-vda.device" ];
+      
       serviceConfig = {
         Type = "oneshot";
         RemainAfterExit = true;

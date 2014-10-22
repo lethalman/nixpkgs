@@ -11,47 +11,62 @@ import ./make-test.nix {
   name = "simple";
 
   # Do not use "machine", to avoid /tmp/vm-state-machine/ clash with other disks
-  nodes.luksMachine = { config, pkgs, lib, ... }: with lib; {
+  nodes.luksLVMMachine = { config, pkgs, lib, ... }: with lib; {
     boot.initrd.luks.devices = mkOverride 9 [
       ({ name = "luksroot"; device = "/dev/vda"; } // (optionalAttrs (!interactive) { keyFile = "/run/lukskey"; }))
     ];
 
     # Create a luks device named luksroot formatted as ext4
     boot.initrd.systemd.services.vdaDisk = {
+      enable = false;
       script = mkForce ''
         echo lukspass > /run/lukskey-create
 
         if ! cryptsetup isLuks /dev/vda; then
           dd if=/dev/zero of=/dev/vda bs=512 count=1
           cryptsetup luksFormat /dev/vda /run/lukskey-create
+          # Support both keyfile and passphrase for interactive test
+          cryptsetup luksOpen /dev/vda luksroot --key-file /run/lukskey-create
+          echo lukspass|cryptsetup luksAddKey /dev/vda -d /run/lukskey-create
+          rm -f /run/lukskey-create
+          cryptsetup luksClose luksroot
         fi
 
-        # Support both keyfile and passphrase for interactive test
         cryptsetup luksOpen /dev/vda luksroot --key-file /run/lukskey-create
-        echo lukspass|cryptsetup luksAddKey /dev/vda -d /run/lukskey-create
-        rm -f /run/lukskey-create
-
-        FSTYPE=$(blkid -o value -s TYPE /dev/mapper/luksroot || true)
-        if test -z "$FSTYPE"; then
-          mke2fs -t ext4 /dev/mapper/luksroot
+        
+        # LVM on luksroot
+        if ! lvm pvscan | grep "PV /dev/mapper/luksroot"; then
+          dd if=/dev/zero of=/dev/mapper/luksroot bs=512 count=1
+          lvm pvcreate /dev/mapper/luksroot
+          lvm vgcreate vg /dev/mapper/luksroot
+          lvm lvcreate -l 100%VG -n lv vg
         fi
+
+        lvm vgchange -a y vg
+        FSTYPE=$(blkid -o value -s TYPE /dev/mapper/vg-lv || true)
+        if test -z "$FSTYPE"; then
+          echo FORMATTING > /dev/kmsg
+          mke2fs -t ext4 /dev/mapper/vg-lv
+          echo FORMATTED > /dev/kmsg
+        fi
+        lvm vgchange -a n vg
 
         cryptsetup luksClose luksroot
       '';
 
-      # Needed for this test, because luksroot.device gets triggered by luksOpen
+      # Needed only for this test
       requiredBy = [ "cryptsetup-luksroot.service" ];
       before = [ "cryptsetup-luksroot.service" ];
     };
 
     # Simulate a crypt key upload
     boot.initrd.systemd.services.cryptKey = {
-      requiredBy = [ "cryptsetup-luksroot.service" ];
-      before = [ "cryptsetup-luksroot.service" ];
-
       script = ''
         echo lukspass > /run/lukskey
       '';
+
+      requiredBy = [ "cryptsetup-luksroot.service" ];
+      before = [ "cryptsetup-luksroot.service" ];
       
       serviceConfig = {
         Type = "oneshot";
@@ -61,9 +76,9 @@ import ./make-test.nix {
 
     fileSystems = mkVMOverride {
       "/" = {
-        device = mkVMOverride "/dev/mapper/luksroot";
+        device = mkVMOverride "/dev/vg/lv";
         systemdInitrdConfig = {
-          # Needed only for this test, because luksroot.device gets triggered by luksOpen in vdaDisk
+          # Needed only for this test
           requires = [ "cryptsetup-luksroot.service" ];
           after = [ "cryptsetup-luksroot.service" ];
         };
