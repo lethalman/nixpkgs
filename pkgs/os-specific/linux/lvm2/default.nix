@@ -1,4 +1,4 @@
-{ stdenv, fetchurl, pkgconfig, udev, utillinux, coreutils, enable_dmeventd ? false }:
+{ stdenv, fetchurl, pkgconfig, udev, utillinux, coreutils, enable_dmeventd ? false, enable_lvmetad ? true }:
 
 let
   version = "2.02.111";
@@ -14,9 +14,12 @@ stdenv.mkDerivation {
     sha256 = "096xjcay4l2ph2dlyknic11pmz65jfgjs34fblqi9xh7zrr3x3vd";
   };
 
+  # Use /run/lvm because there's no /var in initrd
   configureFlags =
-    "--disable-readline --enable-udev_rules --enable-udev_sync --enable-pkgconfig --enable-applib --enable-cmdlib"
+    "--disable-readline --enable-udev_rules --enable-udev_sync --enable-pkgconfig --enable-applib --enable-cmdlib "+
+    "--with-default-pid-dir=/run/lvm --with-default-run-dir=/run/lvm --with-default-dm-run-dir=/run/lvm"
       + (stdenv.lib.optionalString enable_dmeventd " --enable-dmeventd")
+      + (stdenv.lib.optionalString enable_lvmetad " --enable-lvmetad")
       ;
 
   buildInputs = [ pkgconfig udevBootstrap ];
@@ -47,12 +50,16 @@ stdenv.mkDerivation {
     ''
       substituteInPlace $out/lib/udev/rules.d/13-dm-disk.rules \
         --replace $out/sbin/blkid ${utillinux}/sbin/blkid
+      substituteInPlace $out/lib/udev/rules.d/69-dm-lvm-metad.rules \
+        --replace $out/bin/systemd-run ${udevBootstrap}/bin/systemd-run
 
       # Systemd stuff
       mkdir -p $out/etc/systemd/system $out/lib/systemd/system-generators
       cp scripts/blk_availability_systemd_red_hat.service $out/etc/systemd/system
       cp scripts/lvm2_activation_generator_systemd_red_hat $out/lib/systemd/system-generators
     '';
+
+  passthru.udev = udevBootstrap;
 
   meta = {
     homepage = http://sourceware.org/lvm2/;

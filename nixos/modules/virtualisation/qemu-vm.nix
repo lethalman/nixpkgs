@@ -294,6 +294,11 @@ in
       '';
 
       requiredBy = [ "sysroot.mount" ];
+      before = [ "sysroot.mount" ];
+      
+      requires = [ "dev-vda.device" ];
+      after = [ "dev-vda.device" ];
+      
       serviceConfig = {
         Type = "oneshot";
         RemainAfterExit = true;

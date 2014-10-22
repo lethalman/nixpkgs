@@ -59,12 +59,6 @@ let
       cp -pdv ${pkgs.utillinux}/lib/libuuid*.so.* $out/lib
       cp -pdv ${pkgs.utillinux}/lib/libmount*.so.* $out/lib
 
-      # Copy dmsetup and lvm.
-      cp -v ${pkgs.lvm2}/sbin/dmsetup $out/bin/dmsetup
-      cp -v ${pkgs.lvm2}/sbin/lvm $out/bin/lvm
-      cp -v ${pkgs.lvm2}/lib/libdevmapper.so.*.* $out/lib
-      cp -v ${pkgs.systemd}/lib/libsystemd.so.* $out/lib
-
       # Add RAID mdadm tool.
       cp -v ${pkgs.mdadm}/sbin/mdadm $out/bin/mdadm
 
@@ -75,6 +69,7 @@ let
       cp -v ${pkgs.kmod}/lib/libkmod.so.* $out/lib
       cp -v ${pkgs.acl}/lib/libacl.so.* $out/lib
       cp -v ${pkgs.attr}/lib/libattr.so.* $out/lib
+      cp -v ${pkgs.systemd}/lib/libsystemd.so.* $out/lib
 
       # Copy modprobe.
       cp -v ${pkgs.kmod}/bin/kmod $out/bin/
@@ -136,7 +131,7 @@ let
       cp -v ${udev}/lib/udev/rules.d/60-cdrom_id.rules $out/
       cp -v ${udev}/lib/udev/rules.d/60-persistent-storage.rules $out/
       cp -v ${udev}/lib/udev/rules.d/80-drivers.rules $out/
-      cp -v ${pkgs.lvm2}/lib/udev/rules.d/*.rules $out/
+      
       cp -v ${pkgs.mdadm}/lib/udev/rules.d/*.rules $out/
       ${config.boot.initrd.extraUdevCommands}
 
