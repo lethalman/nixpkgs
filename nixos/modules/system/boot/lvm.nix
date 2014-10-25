@@ -107,20 +107,6 @@ in
         ExecStop = "${extraUtils}/bin/lvm pvscan --cache %i";
       };
     };
-    
-    # boot.initrd.systemd.services.lvm = {
-    #   description = "Logical Volume Manager activation";
-
-    #   wantedBy = [ "default.target" ];
-    #   requires = [ "lvmetad.service" ];
-    #   after = [ "lvmetad.service" ];
-
-    #   serviceConfig = {
-    #     Type = "oneshot";
-    #     ExecStart = "${extraUtils}/bin/lvm vgchange --sysinit -aay";
-    #     RemainAfterExit = true;
-    #   };
-    # };
 
     boot.initrd.extraContents = [
       {

@@ -26,6 +26,7 @@ let
           + (if keyFile != null then " ${keyFile}" else " -")
           + optionalString allowDiscards " allow-discards"
           + optionalString (keyFileSize != null) " keyfile-size=${toString keyFileSize}";
+		ExecStop = "${extraUtils}/bin/systemd-cryptsetup detach ${name}";
         RemainAfterExit = true;
       };
     };
