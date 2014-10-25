@@ -214,11 +214,6 @@ let
     ''}
   '';
 
-  # Ignored by systemd in initrd
-  isPreLVM = f: f.preLVM;
-  preLVM = filter isPreLVM luks.devices;
-  postLVM = filter (f: !(isPreLVM f)) luks.devices;
-
 in
 {
 
@@ -480,10 +475,6 @@ EOF
     '';
 
     boot.initrd.systemd.services = listToAttrs (map mkService luks.devices);
-
-    # Ignored by systemd in initrd
-    boot.initrd.preLVMCommands = concatMapStrings openCommand preLVM;
-    boot.initrd.postDeviceCommands = concatMapStrings openCommand postLVM;
 
     environment.systemPackages = [ pkgs.cryptsetup ];
   };

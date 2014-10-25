@@ -21,13 +21,6 @@ in
         type = types.bool;
       };
 
-      autoActivation = mkOption {
-        default = [];
-        example = [ "myvg" ];
-        description = "List of volume groups to autoactivate at boot. If left empty, all volume groups will be activated.";
-        type = types.listOf types.str;
-      };
-
       config = mkOption {
         default = ''
           global {

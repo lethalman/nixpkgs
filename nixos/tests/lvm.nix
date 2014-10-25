@@ -1,7 +1,7 @@
 import ./make-test.nix {
   name = "simple";
 
-  # Do not use "machine", to avoid /tmp/vm-state-machine/ clash with other simple machines
+  # Do not use "machine", to avoid /tmp/vm-state-machine/ clash with other disks
   nodes.lvmMachine = { config, pkgs, lib, ... }: with lib; {
     # Create a group with a single volume for the root
     boot.initrd.systemd.services.vdaDisk = {

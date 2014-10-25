@@ -10,11 +10,15 @@
 import ./make-test.nix {
   name = "simple";
 
-  machine = { config, pkgs, lib, ... }: with lib; {
+  # Do not use "machine", to avoid /tmp/vm-state-machine/ clash with other disks
+  nodes.luksMachine = { config, pkgs, lib, ... }: with lib; {
     boot.initrd.luks.devices = mkOverride 9 [
       ({ name = "luksroot"; device = "/dev/vda"; } // (optionalAttrs (!interactive) { keyFile = "/run/lukskey"; }))
     ];
 
+    # Disable lvm
+    boot.initrd.lvm.enable = false;
+    
     # Create a luks device named luksroot formatted as ext4
     boot.initrd.systemd.services.vdaDisk = {
       script = mkForce ''
@@ -23,7 +27,8 @@ import ./make-test.nix {
         if ! cryptsetup isLuks /dev/vda; then
           cryptsetup luksFormat /dev/vda /run/lukskey-create
         fi
-        
+
+        # Support both keyfile and passphrase for interactive test
         cryptsetup luksOpen /dev/vda luksroot --key-file /run/lukskey-create
         echo lukspass|cryptsetup luksAddKey /dev/vda -d /run/lukskey-create
         rm -f /run/lukskey-create
@@ -72,7 +77,7 @@ import ./make-test.nix {
   testScript =
     ''
       startAll;
-      $machine->waitForUnit("multi-user.target");
-      $machine->shutdown;
+      $luksMachine->waitForUnit("multi-user.target");
+      $luksMachine->shutdown;
     '';
 } args
