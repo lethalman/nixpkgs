@@ -38,10 +38,10 @@ in
 
     # copy devicemapper and lvm
     boot.initrd.extraUtilsCommands = ''
-      cp -v ${pkgs.lvm2}/sbin/dmsetup $out/bin/dmsetup
+      cp -vf ${pkgs.lvm2}/sbin/dmsetup $out/bin/dmsetup
       cp -v ${pkgs.lvm2}/sbin/lvm $out/bin/lvm
       cp -v ${pkgs.lvm2}/sbin/lvmetad $out/bin/lvmetad
-      cp -v ${pkgs.lvm2}/lib/libdevmapper.so.*.* $out/lib
+      cp -vf ${pkgs.lvm2}/lib/libdevmapper.so.*.* $out/lib
       cp -vf ${pkgs.glibc}/lib/librt.so.* $out/lib
     '';
     

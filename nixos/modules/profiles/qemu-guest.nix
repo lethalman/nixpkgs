@@ -15,13 +15,9 @@ with utils;
   boot.initrd.systemd.services.hwclockBug = {
 	  description = "Workaround kvm hwclock bug";
 
-    # Do not stop when isolating to another unit
-    wantedBy = [ "sysinit.target" ];
+    wantedBy = [ "basic.target" ];
     before = [ "default.target" ];
-    unitConfig = {
-      DefaultDependencies = false;
-    };
-    
+
     serviceConfig = {
       Type = "oneshot";
       RemainAfterExit = true;

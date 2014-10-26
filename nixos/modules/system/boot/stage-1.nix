@@ -103,8 +103,6 @@ let
       export LD_LIBRARY_PATH=$out/lib
       $out/bin/mount --version 2>&1 | grep "util-linux"
       $out/bin/udevadm --version
-      $out/bin/dmsetup --version 2>&1 | tee -a log | grep "version:"
-      LVM_SYSTEM_DIR=$out $out/bin/lvm version 2>&1 | tee -a log | grep "LVM"
       $out/bin/mdadm --version
 
       ${config.boot.initrd.extraUtilsCommandsTest}

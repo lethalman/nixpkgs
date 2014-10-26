@@ -248,7 +248,7 @@ in
 
     boot.initrd.luks.devices = mkOption {
       default = [ ];
-      example = [ { name = "luksroot"; device = "/dev/sda3"; preLVM = true; } ];
+      example = [ { name = "luksroot"; device = "/dev/sda3"; } ];
       description = ''
         The list of devices that should be decrypted using LUKS before trying to mount the
         root partition. This works for both LVM-over-LUKS and LUKS-over-LVM setups.
@@ -296,12 +296,6 @@ in
             <literal>keyFile</literal> will be used decryption, instead of just
             the first <literal>keyFileSize</literal> bytes.
           '';
-        };
-
-        preLVM = mkOption {
-          default = true;
-          type = types.bool;
-          description = "Whether the luksOpen will be attempted before LVM scan or after it.";
         };
 
         allowDiscards = mkOption {
@@ -474,6 +468,8 @@ EOF
         $out/bin/openssl-wrap version
       ''}
     '';
+
+    boot.initrd.lvm.enable = mkForce true; # really depends on lvm
 
     boot.initrd.systemd.services = listToAttrs (map mkService luks.devices);
 

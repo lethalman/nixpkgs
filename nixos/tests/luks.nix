@@ -16,15 +16,13 @@ import ./make-test.nix {
       ({ name = "luksroot"; device = "/dev/vda"; } // (optionalAttrs (!interactive) { keyFile = "/run/lukskey"; }))
     ];
 
-    # Disable lvm
-    boot.initrd.lvm.enable = false;
-    
     # Create a luks device named luksroot formatted as ext4
     boot.initrd.systemd.services.vdaDisk = {
       script = mkForce ''
         echo lukspass > /run/lukskey-create
 
         if ! cryptsetup isLuks /dev/vda; then
+          dd if=/dev/zero of=/dev/vda bs=512 count=1
           cryptsetup luksFormat /dev/vda /run/lukskey-create
         fi
 
