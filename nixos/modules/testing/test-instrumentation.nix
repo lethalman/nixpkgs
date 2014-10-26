@@ -46,9 +46,15 @@ let kernel = config.boot.kernelPackages.kernel; in
     # timeouts in the VM should also be delayed).
     boot.initrd.systemd.services.acpi_pm = {
       description = "Set clock source to acpi_pm";
-      wantedBy = [ "initrd.target" ];
-      before = [ "initrd.target" ];
+      before = [ "default.target" ];
       after = [ (utils.escapeSystemdPath "/sys/devices/system/clocksource/clocksource0.device") ];
+
+      # Do not stop when isolating to another unit
+      wantedBy = [ "sysinit.target" ];
+      unitConfig = {
+        DefaultDependencies = false;
+      };
+      
       serviceConfig = {
         Type = "oneshot";
         RemainAfterExit = true;
