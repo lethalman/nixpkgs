@@ -23,13 +23,13 @@ import ./make-test.nix {
         echo lukspass > /run/lukskey-create
 
         if ! cryptsetup isLuks /dev/vda; then
+          dd if=/dev/zero of=/dev/vda bs=512 count=1
           cryptsetup luksFormat /dev/vda /run/lukskey-create
+          # Support both keyfile and passphrase for interactive test
+          cryptsetup luksOpen /dev/vda luksroot --key-file /run/lukskey-create
+          echo lukspass|cryptsetup luksAddKey /dev/vda -d /run/lukskey-create
+          rm -f /run/lukskey-create
         fi
-
-        # Support both keyfile and passphrase for interactive test
-        cryptsetup luksOpen /dev/vda luksroot --key-file /run/lukskey-create
-        echo lukspass|cryptsetup luksAddKey /dev/vda -d /run/lukskey-create
-        rm -f /run/lukskey-create
 
         # LVM on luksroot
         if ! lvm pvscan | grep "PV /dev/mapper/luksroot"; then

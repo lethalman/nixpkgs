@@ -74,7 +74,7 @@ in
     
     boot.initrd.systemd.services.lvmetad = {
       description = "LVM2 metadata daemon";
-
+      enable = false;
       wantedBy = [ "sysinit.target" ];
       environment.SD_ACTIVATION = "1";
 

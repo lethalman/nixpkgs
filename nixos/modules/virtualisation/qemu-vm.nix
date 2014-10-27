@@ -293,17 +293,11 @@ in
         fi
       '';
 
-      requiredBy = [ "sysroot.mount" ];
+      wantedBy = [ "basic.target" ];
       before = [ "sysroot.mount" ];
       
       requires = [ "dev-vda.device" ];
       after = [ "dev-vda.device" ];
-
-      # Do not stop when isolating to another unit
-      wantedBy = [ "sysinit.target" ];
-      unitConfig = {
-        DefaultDependencies = false;
-      };
       
       serviceConfig = {
         Type = "oneshot";
