@@ -29,8 +29,11 @@ import ./make-test.nix {
           cryptsetup luksOpen /dev/vda luksroot --key-file /run/lukskey-create
           echo lukspass|cryptsetup luksAddKey /dev/vda -d /run/lukskey-create
           rm -f /run/lukskey-create
+          cryptsetup luksClose luksroot
         fi
 
+        cryptsetup luksOpen /dev/vda luksroot --key-file /run/lukskey-create
+        
         # LVM on luksroot
         if ! lvm pvscan | grep "PV /dev/mapper/luksroot"; then
           dd if=/dev/zero of=/dev/mapper/luksroot bs=512 count=1
@@ -71,23 +74,9 @@ import ./make-test.nix {
       };
     };
 
-    boot.initrd.systemd.services.boh = {
-      script = ''
-        sleep 1
-      '';
-
-      requires = [ "cryptsetup-luksroot.service" ];
-      after = [ "cryptsetup-luksroot.service" ];
-      
-      serviceConfig = {
-        Type = "oneshot";
-        RemainAfterExit = true;
-      };
-    };
-
     fileSystems = mkVMOverride {
       "/" = {
-        device = mkVMOverride "/dev/mapper/vg-lv";
+        device = mkVMOverride "/dev/vg/lv";
         systemdInitrdConfig = {
           # Needed only for this test
           requires = [ "cryptsetup-luksroot.service" ];

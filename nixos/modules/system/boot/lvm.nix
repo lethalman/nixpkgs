@@ -23,9 +23,21 @@ in
 
       config = mkOption {
         default = ''
-          global {
-            use_lvmetad = 1
-          }
+devices {
+    dir = "/dev"
+    scan = [ "/dev" ]
+    sysfs_scan = 1
+    md_component_detection = 1
+}
+
+global {
+    umask = 077
+    activation = 1
+    proc = "/proc"
+    locking_type = 1
+    locking_dir = "/var/lock/lvm"
+}
+
         '';
         description = "LVM configuration in initrd.";
         type = types.str;
@@ -58,6 +70,7 @@ in
     '';
 
     boot.initrd.systemd.sockets.lvmetad = {
+      enable = false;
       listenStreams = [ "/run/lvm/lvmetad.socket" ];
 
       wantedBy = [ "sysinit.target"];
@@ -94,6 +107,7 @@ in
 
     # Called by udev.
     boot.initrd.systemd.services."lvm2-pvscan@" = {
+      enable = false;
       description = "LVM2 PV scan on device %i";
 
       bindsTo = [ "dev-block-%i.device" ];
@@ -111,7 +125,7 @@ in
     boot.initrd.extraContents = [
       {
         object = pkgs.writeText "lvm.conf" config.boot.initrd.lvm.config;
-        symlink = "/etc/lvm/lvm.conf";
+        symlink = "/etc/lvm/lvmasd.conf";
       }
     ];
   };
