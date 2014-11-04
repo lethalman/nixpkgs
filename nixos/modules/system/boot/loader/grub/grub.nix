@@ -23,9 +23,10 @@ let
       grub = f grub;
       shell = "${pkgs.stdenv.shell}";
       fullVersion = (builtins.parseDrvName realGrub.name).version;
+      inherit (config.boot.loader) timeout;
       inherit (cfg)
         version extraConfig extraPerEntryConfig extraEntries
-        extraEntriesBeforeNixOS extraPrepareConfig configurationLimit copyKernels timeout
+        extraEntriesBeforeNixOS extraPrepareConfig configurationLimit copyKernels
         default devices fsIdentifier;
       path = (makeSearchPath "bin" [
         pkgs.coreutils pkgs.gnused pkgs.gnugrep pkgs.findutils pkgs.diffutils pkgs.btrfsProgs
@@ -192,14 +193,6 @@ in
           Whether the GRUB menu builder should copy kernels and initial
           ramdisks to /boot.  This is done automatically if /boot is
           on a different partition than /.
-        '';
-      };
-
-      timeout = mkOption {
-        default = 5;
-        type = types.int;
-        description = ''
-          Timeout (in seconds) until GRUB boots the default menu item.
         '';
       };
 

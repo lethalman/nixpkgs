@@ -74,7 +74,7 @@ with lib;
 
   boot.loader.grub.version = 2;
   boot.loader.grub.device = "/dev/vda";
-  boot.loader.grub.timeout = 0;
+  boot.loader.timeout = 0;
 
   # Put /tmp and /var on /ephemeral0, which has a lot more space.
   # Unfortunately we can't do this with the `fileSystems' option

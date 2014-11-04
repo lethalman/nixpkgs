@@ -96,6 +96,8 @@ in zipModules ([]
 ++ obsolete [ "boot" "initrd" "extraKernelModules" ] [ "boot" "initrd" "kernelModules" ]
 ++ obsolete [ "boot" "extraKernelParams" ] [ "boot" "kernelParams" ]
 
+++ deprecated [ "boot" "loader" "grub" "timeout" ] [ "boot" "loader" "timeout" ]
+
 # OpenSSH
 ++ obsolete [ "services" "sshd" "ports" ] [ "services" "openssh" "ports" ]
 ++ alias [ "services" "sshd" "enable" ] [ "services" "openssh" "enable" ]

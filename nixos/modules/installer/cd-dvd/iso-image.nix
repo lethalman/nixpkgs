@@ -15,6 +15,7 @@ let
     UI vesamenu.c32
     MENU TITLE NixOS
     MENU BACKGROUND /isolinux/background.png
+    TIMEOUT ${builtins.toString config.boot.loader.timeout}0
 
     LABEL boot
     MENU LABEL Boot NixOS
