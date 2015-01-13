@@ -1,48 +1,40 @@
-diff --git a/src/dhcp-manager/nm-dhcp-dhclient.c b/src/dhcp-manager/nm-dhcp-dhclient.c
-index 0932139..5b5aee8 100644
---- a/src/dhcp-manager/nm-dhcp-dhclient.c
-+++ b/src/dhcp-manager/nm-dhcp-dhclient.c
-@@ -68,10 +68,6 @@ const char *
- nm_dhcp_dhclient_get_path (const char *try_first)
- {
- 	static const char *dhclient_paths[] = {
--		"/sbin/dhclient",
--		"/usr/sbin/dhclient",
--		"/usr/pkg/sbin/dhclient",
--		"/usr/local/sbin/dhclient",
- 		NULL
- 	};
- 	const char **path = dhclient_paths;
-diff --git a/src/dhcp-manager/nm-dhcp-dhcpcd.c b/src/dhcp-manager/nm-dhcp-dhcpcd.c
-index 237661f..48bc33f 100644
---- a/src/dhcp-manager/nm-dhcp-dhcpcd.c
-+++ b/src/dhcp-manager/nm-dhcp-dhcpcd.c
-@@ -51,10 +51,6 @@ const char *
- nm_dhcp_dhcpcd_get_path (const char *try_first)
- {
- 	static const char *dhcpcd_paths[] = {
--		"/sbin/dhcpcd",
--		"/usr/sbin/dhcpcd",
--		"/usr/pkg/sbin/dhcpcd",
--		"/usr/local/sbin/dhcpcd",
- 		NULL
- 	};
- 	const char **path = dhcpcd_paths;
-diff --git a/src/nm-device.c b/src/nm-device.c
-index 1dc94ee..e60f3c8 100644
---- a/src/nm-device.c
-+++ b/src/nm-device.c
-@@ -1321,8 +1321,7 @@ aipd_start (NMDevice *self, NMDeviceStateReason *reason)
- 	char *argv[6], *cmdline;
- 	const char **aipd_binary = NULL;
- 	static const char *aipd_paths[] = {
--		"/usr/sbin/avahi-autoipd",
--		"/usr/local/sbin/avahi-autoipd",
-+		"@avahi@/sbin/avahi-autoipd",
- 		NULL
- 	};
- 	int i = 0;
-@@ -2555,7 +2554,7 @@ share_init (void)
+diff --git a/src/NetworkManagerUtils.c b/src/NetworkManagerUtils.c
+index 2c291cd..9a860dc 100644
+--- a/src/NetworkManagerUtils.c
++++ b/src/NetworkManagerUtils.c
+@@ -811,11 +811,6 @@ nm_utils_kill_process_sync (pid_t pid, guint64 start_time, int sig, guint64 log_
+ const char *const NM_PATHS_DEFAULT[] = {
+ 	PREFIX "/sbin/",
+ 	PREFIX "/bin/",
+-	"/sbin/",
+-	"/usr/sbin/",
+-	"/usr/local/sbin/",
+-	"/usr/bin/",
+-	"/usr/local/bin/",
+ 	NULL,
+ };
+ 
+diff --git a/src/devices/nm-device.c b/src/devices/nm-device.c
+index a989953..25c07a5 100644
+--- a/src/devices/nm-device.c
++++ b/src/devices/nm-device.c
+@@ -2750,14 +2750,7 @@ aipd_start (NMDevice *self, NMDeviceStateReason *reason)
+ 	aipd_cleanup (self);
+ 
+ 	/* Find avahi-autoipd */
+-	aipd_binary = nm_utils_find_helper ("avahi-autoipd", NULL, NULL);
+-	if (!aipd_binary) {
+-		_LOGW (LOGD_DEVICE | LOGD_AUTOIP4,
+-		       "Activation: Stage 3 of 5 (IP Configure Start) failed"
+-		       " to start avahi-autoipd: not found");
+-		*reason = NM_DEVICE_STATE_REASON_AUTOIP_START_FAILED;
+-		return NM_ACT_STAGE_RETURN_FAILURE;
+-	}
++	aipd_binary = "@avahi@/sbin/avahi-autoipd";
+ 
+ 	argv[i++] = aipd_binary;
+ 	argv[i++] = "--script";
+@@ -4982,7 +4975,7 @@ share_init (void)
  	}
  
  	for (iter = modules; *iter; iter++) {
@@ -51,22 +43,42 @@ index 1dc94ee..e60f3c8 100644
  		char *envp[1] = { NULL };
  		GError *error = NULL;
  
+@@ -5095,11 +5088,7 @@ send_arps (NMDevice *self, const char *mode_arg)
+ 	if (num == 0)
+ 		return;
+ 
+-	argv[0] = nm_utils_find_helper ("arping", NULL, NULL);
+-	if (!argv[0]) {
+-		_LOGW (LOGD_DEVICE | LOGD_IP4, "arping could not be found; no ARPs will be sent");
+-		return;
+-	}
++	argv[0] = "@iputils@/bin/arping";
+ 
+ 	for (i = 0; i < num; i++) {
+ 		gs_free char *tmp_str = NULL;
+@@ -6196,7 +6185,7 @@ nm_device_start_ip_check (NMDevice *self)
+ 		if (priv->ip4_config && priv->ip4_state == IP_DONE) {
+ 			guint gw = 0;
+ 
+-			ping_binary = "/usr/bin/ping";
++			ping_binary = "@iputils@/bin/ping";
+ 			log_domain = LOGD_IP4;
+ 
+ 			gw = nm_ip4_config_get_gateway (priv->ip4_config);
+@@ -6205,7 +6194,7 @@ nm_device_start_ip_check (NMDevice *self)
+ 		} else if (priv->ip6_config && priv->ip6_state == IP_DONE) {
+ 			const struct in6_addr *gw = NULL;
+ 
+-			ping_binary = "/usr/bin/ping6";
++			ping_binary = "@iputils@/bin/ping6";
+ 			log_domain = LOGD_IP6;
+ 
+ 			gw = nm_ip6_config_get_gateway (priv->ip6_config);
 diff --git a/src/ppp-manager/nm-ppp-manager.c b/src/ppp-manager/nm-ppp-manager.c
-index 59698c3..7dba0f7 100644
+index 4fac96d..d14622f 100644
 --- a/src/ppp-manager/nm-ppp-manager.c
 +++ b/src/ppp-manager/nm-ppp-manager.c
-@@ -661,9 +661,7 @@ static inline const char *
- nm_find_pppd (void)
- {
- 	static const char *pppd_binary_paths[] = {
--		"/usr/local/sbin/pppd",
--		"/usr/sbin/pppd",
--		"/sbin/pppd",
-+		"@ppp@/sbin/pppd",
- 		NULL
- 	};
- 
-@@ -988,7 +986,7 @@ nm_ppp_manager_start (NMPPPManager *manager,
+@@ -1103,7 +1103,7 @@ nm_ppp_manager_start (NMPPPManager *manager,
  
  	/* Make sure /dev/ppp exists (bgo #533064) */
  	if (stat ("/dev/ppp", &st) || !S_ISCHR (st.st_mode))

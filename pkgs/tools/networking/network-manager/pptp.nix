@@ -1,18 +1,18 @@
 { stdenv, fetchurl, networkmanager, pptp, ppp, intltool, pkgconfig, substituteAll
-, withGnome ? true, gnome3 }:
+, withGnome ? true, libsecret-unstable, gnome3, libnm-gtk }:
 
 stdenv.mkDerivation rec {
   name = "${pname}${if withGnome then "-gnome" else ""}-${version}";
   pname = "NetworkManager-pptp";
-  version = "0.9.8.4";
+  version = networkmanager.version;
 
   src = fetchurl {
-    url = "mirror://gnome/sources/${pname}/0.9/${pname}-${version}.tar.xz";
-    sha256 = "1s6wmznd6azvg028x8y3syniqy9j7nmx5j71w2wc6mk0f9pqzflp";
+    url = "mirror://gnome/sources/${pname}/1.0/${pname}-${version}.tar.xz";
+    sha256 = "0xpflw6vp1ahvpz7mnnldqvk455wz2j7dahd9lxqs95frmjmq390";
   };
 
   buildInputs = [ networkmanager pptp ppp ]
-    ++ stdenv.lib.optionals withGnome [ gnome3.gtk gnome3.libgnome_keyring ];
+    ++ stdenv.lib.optionals withGnome [ libsecret-unstable libnm-gtk gnome3.gtk gnome3.libgnome_keyring ];
 
   nativeBuildInputs = [ intltool pkgconfig ];
 

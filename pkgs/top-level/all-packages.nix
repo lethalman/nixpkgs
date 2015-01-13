@@ -1904,7 +1904,7 @@ let
 
   networkmanager_openconnect = callPackage ../tools/networking/network-manager/openconnect.nix { };
 
-  networkmanagerapplet = newScope gnome ../tools/networking/network-manager-applet { dconf = gnome3.dconf; };
+  networkmanagerapplet = newScope gnome ../tools/networking/network-manager-applet { };
 
   newsbeuter = callPackage ../applications/networking/feedreaders/newsbeuter { };
 
@@ -5925,6 +5925,8 @@ let
 
   libsecret = callPackage ../development/libraries/libsecret { };
 
+  libsecret-unstable = callPackage ../development/libraries/libsecret/unstable.nix { };
+
   libserialport = callPackage ../development/libraries/libserialport { };
 
   libgtop = callPackage ../development/libraries/libgtop {};
@@ -6053,6 +6055,8 @@ let
   libnfsidmap = callPackage ../development/libraries/libnfsidmap { };
 
   libnice = callPackage ../development/libraries/libnice { };
+
+  libnm-gtk = networkmanagerapplet.override { applet = false; };
 
   liboping = callPackage ../development/libraries/liboping { };
 

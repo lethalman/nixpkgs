@@ -1,18 +1,18 @@
 { stdenv, fetchurl, openvpn, intltool, pkgconfig, networkmanager
-, withGnome ? true, gnome3, procps, module_init_tools }:
+, withGnome ? true, libsecret-unstable, gnome3, procps, module_init_tools, libnm-gtk }:
 
 stdenv.mkDerivation rec {
   name = "${pname}${if withGnome then "-gnome" else ""}-${version}";
   pname = "NetworkManager-openvpn";
-  version = "0.9.8.4";
+  version = networkmanager.version;
 
   src = fetchurl {
-    url = "mirror://gnome/sources/${pname}/0.9/${pname}-${version}.tar.xz";
-    sha256 = "11v63s1f3bsa7pmkvr7x65rsigh48wfqzsnixrwc3wqslsv5535g";
+    url = "mirror://gnome/sources/${pname}/1.0/${pname}-${version}.tar.xz";
+    sha256 = "1w0v3xah0wg467jy0fd3188zla8q4l1iq0zdy28bcdipin693bfh";
   };
 
   buildInputs = [ openvpn networkmanager ]
-    ++ stdenv.lib.optionals withGnome [ gnome3.gtk gnome3.libgnome_keyring ];
+    ++ stdenv.lib.optionals withGnome [ libsecret-unstable libnm-gtk gnome3.gtk gnome3.libgnome_keyring ];
 
   nativeBuildInputs = [ intltool pkgconfig ];
 
