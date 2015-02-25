@@ -11,10 +11,10 @@ hicolorIconThemeHook() {
 envHooks+=(hicolorIconThemeHook)
 
 # Remove icon cache
-hicolorPreFixupPhase() {
-    rm -f $out/share/icons/hicolor/icon-theme.cache
-    rm -f $out/share/icons/HighContrast/icon-theme.cache
+hicolorFixupHook() {
+    rm -f $prefix/share/icons/hicolor/icon-theme.cache
+    rm -f $prefix/share/icons/HighContrast/icon-theme.cache
 }
 
-preFixupPhases="$preFixupPhases hicolorPreFixupPhase"
+fixupOutputHooks+=(hicolorFixupHook)
 

@@ -10,8 +10,8 @@ make_glib_find_gsettings_schemas() {
 
 envHooks+=(make_glib_find_gsettings_schemas)
 
-glibPreFixupPhase() {
-    addToSearchPath GSETTINGS_SCHEMAS_PATH "$out/share/gsettings-schemas/$name"
+glibFixupHook() {
+    addToSearchPath GSETTINGS_SCHEMAS_PATH "$prefix/share/gsettings-schemas/$name"
 }
 
-preFixupPhases="$preFixupPhases glibPreFixupPhase"
+fixupOutputHooks+=(glibFixupHook)
